@@ -3,7 +3,9 @@ const asyncHandler = require("express-async-handler") // error handler express p
 const User = require("../models/userModel");
 const bcrypt = require("bcryptjs") // password encrypt
 const jwt = require("jsonwebtoken");
-const { use } = require("../routes/userRoute");
+const Token = require("../models/tokenModel");
+const crypto = require('crypto');
+const sendEmail = require("../utils/sendEmail");
 
 
 const generateToken = (id) =>{
@@ -214,6 +216,70 @@ const updateUser = asyncHandler(async (req, res) =>{
             throw new Error("old password is not correct ")
         }
  })
+
+ //--- FORGOTE PASSWORD
+ const forgotePassword = asyncHandler(async (req, res) => {
+    const {email} = req.body;
+
+    // check email existance
+    const user = await User.findOne({email});
+    if(!user){
+        res.status(400);
+        throw new Error("User dosen't exist with this email")
+    }
+
+    // Delete existing token just to refresh the token
+   const token = await Token.findOne({userId: user._id});
+   if(token){
+   await token.deleteOne();
+   }
+
+ // create reset token
+  let resetToken = crypto.randomBytes(32).toString('hex') + user._id;
+ // lets encrypt the token before send to DB
+
+  const hashedToken = crypto.createHash("sha256").update(resetToken).digest('hex')
+
+    await new Token({
+        userId: user._id,
+        token: hashedToken,
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 30 * (60 * 1000) // 30 minute
+
+    }).save();
+
+    // reset token
+
+    const resetUrl = `${process.env.FRONTEND_URL}/resetpassword/${resetToken}`;
+
+    //send mail
+    const message = `
+    <h2>Hello Dear ${user.name}</h2>
+    <p>this is reset password link. it ecpiered after 30 minute</p>
+
+    <a href=${resetUrl} clicktracking= off>${resetUrl}</a>
+
+    <p> Regards TFNA Plc.</p>
+    `;
+    const subject = "Password Reset Request"
+
+    const send_to = user.email
+    const sent_from = process.env.USER_EMAIL
+
+    try {
+        await sendEmail(subject,message,send_to, sent_from);
+        res.status(200).json({
+            status : true,
+            message: "Password reset link send to your email sucssfuly"
+        })
+    } catch (error) {
+        res.status(400);
+        new Error(error.message,  "oops! somethig wnet wrong, email not sent")
+    }
+
+ })
+
+
 module.exports = {
     userRegister,
     loginUser,
@@ -221,5 +287,6 @@ module.exports = {
     getUser,
     loginStatus,
     updateUser,
-    changePassword
+    changePassword,
+    forgotePassword
 }
