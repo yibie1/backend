@@ -279,6 +279,34 @@ const updateUser = asyncHandler(async (req, res) =>{
 
  })
 
+ // -- RESET PASSWORD
+
+ const resetPassword = asyncHandler(async (req, res) => {
+    const {password} = req.body;
+    const {resetToken} = req.params
+
+    const hashedToken = crypto.createHash("sha256").update(resetToken).digest('hex')
+     // check the token is exist in DB
+
+     const userToken =await Token.findOne({
+        token: hashedToken,
+        expiresAt: {$gt: Date.now()}
+     }) //checking token exist and not expired
+
+     if(!userToken){
+        res.status(400)
+        throw new Error("The Token is Invalid or Exipred ")
+     }
+    const user = await User.findOne({_id: userToken.userId});
+        const salt = await bcrypt.genSalt(10)
+        const hashPassword = await bcrypt.hash(password, salt)
+        user.password = hashPassword
+        await user.save()
+        res.status(200).json({
+            message: "password resetd sucssfuly, Login"
+        })
+
+ })
 
 module.exports = {
     userRegister,
@@ -288,5 +316,7 @@ module.exports = {
     loginStatus,
     updateUser,
     changePassword,
-    forgotePassword
+    forgotePassword,
+    resetPassword
+
 }
