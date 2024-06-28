@@ -66,7 +66,42 @@ const getProduct = asyncHandler(async (req, res)=> {
 }
 })
 
+//--- GET SINGLE PRODUCT
+
+const getSingleProduct = asyncHandler(async(req, res) =>{
+   const product = await Product.findById(req.params.id)
+   if(!product){
+    res.status(404)
+    throw new Error("Product Not Found")
+   }
+   if(product.user.toString() !== req.user.id){
+    res.status(401)
+    throw new Error("Not Autorized to see this product")
+   }
+
+    res.status(200).json(product);
+
+
+})
+
+const deleteProduct = asyncHandler(async (req, res) => {
+    const product = await Product.findByIdAndDelete(req.params.id)
+    if(!product){
+        res.status(404)
+        throw new Error("Product Not Found")
+       }
+       if(product.user.toString() !== req.user.id){
+        res.status(401)
+        throw new Error("Not Autorized to see this product")
+       }
+    //    await product.remove() // delete product
+       res.status(200).json({
+        message: "Product deleted sucssfully"
+       })
+})
 module.exports = {
     addProduct,
-    getProduct
+    getProduct,
+    getSingleProduct,
+    deleteProduct
 }
